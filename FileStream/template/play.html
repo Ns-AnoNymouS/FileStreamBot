@@ -12,14 +12,13 @@
       height: 100%;
       width: 100%;
       background: black;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      overflow: hidden;
       position: relative;
     }
     video {
-      max-width: 100%;
-      height: auto;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       background-color: black;
     }
     .thumbnail-overlay {
@@ -48,65 +47,34 @@
       transition: all 0.3s;
       box-shadow: 0 0 20px rgba(255,255,255,0.2);
     }
-    .thumbnail-overlay .play-btn:hover {
-      background: rgba(255, 255, 255, 0.4);
-      box-shadow: 0 0 30px rgba(255,255,255,0.4);
-    }
     .thumbnail-overlay .play-btn::after {
       content: '';
-      display: block;
       border-style: solid;
       border-width: 18px 0 18px 30px;
       border-color: transparent transparent transparent white;
       margin-left: 6px;
     }
-    @media (min-width: 768px) {
-      body { display: block; }
-      video {
-        width: 100vw;
-        height: 100vh;
-        object-fit: cover;
-      }
+    .gesture-zone {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 100%;
+      z-index: 15;
     }
-    .custom-skip-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: none;
-      color: white;
-      padding: 6px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-      margin: 0 6px;
-      font-size: 14px;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.08);
-      transition: all 0.3s ease;
+    .zone-left, .zone-right, .zone-center {
+      position: absolute;
+      top: 0;
+      height: 100%;
     }
-    .custom-skip-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-      color: #fff;
-    }
+    .zone-left { width: 30%; left: 0; }
+    .zone-right { width: 30%; right: 0; }
+    .zone-center { width: 40%; left: 30%; }
     .plyr__controls {
-      background: rgba(0,0,0,0.6);
-      padding: 10px 16px;
-      border-radius: 14px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+      transition: opacity 0.3s ease;
     }
-    .plyr__time {
-      font-size: 14px;
-      font-weight: 500;
-      color: #f0f0f0;
-    }
-    .plyr__time--duration {
-      margin-left: 8px;
-      color: #ccc;
-    }
-    .plyr__progress input[type="range"] {
-      height: 6px;
-      border-radius: 4px;
-      background: #444;
-    }
-    .plyr__progress input[type="range"]::-webkit-slider-thumb {
-      background: #fff;
+    .plyr--hide-controls .plyr__controls {
+      opacity: 0 !important;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -117,6 +85,12 @@
   <div class="play-btn"></div>
 </div>
 
+<div class="gesture-zone">
+  <div class="zone-left"></div>
+  <div class="zone-center"></div>
+  <div class="zone-right"></div>
+</div>
+
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
   const video = document.getElementById('player');
@@ -125,7 +99,7 @@
 
   const player = new Plyr(video, {
     controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
-    hideControls: true,
+    hideControls: false,
   });
 
   thumbnail.addEventListener('click', () => {
@@ -163,6 +137,45 @@
 
     currentTimeElement.parentNode.appendChild(durationElement);
   });
+
+  // Gesture handling
+  let singleTapTimer = null;
+
+  function singleTapAction() {
+    if (player.elements.container.classList.contains('plyr--hide-controls')) {
+      player.elements.container.classList.remove('plyr--hide-controls');
+    } else {
+      player.elements.container.classList.add('plyr--hide-controls');
+    }
+  }
+
+  function doubleTapAction(action) {
+    if (action === 'left') video.currentTime = Math.max(video.currentTime - 10, 0);
+    if (action === 'right') video.currentTime = Math.min(video.currentTime + 10, video.duration);
+    if (action === 'center') video.paused ? video.play() : video.pause();
+  }
+
+  function setupDoubleTap(zone, action) {
+    let lastTap = 0;
+    zone.addEventListener('touchend', (e) => {
+      const currentTime = new Date().getTime();
+      if (currentTime - lastTap < 300) {
+        clearTimeout(singleTapTimer);
+        doubleTapAction(action);
+      } else {
+        singleTapTimer = setTimeout(() => {
+          if (action === 'center') {
+            singleTapAction();
+          }
+        }, 300);
+      }
+      lastTap = currentTime;
+    });
+  }
+
+  setupDoubleTap(document.querySelector('.zone-left'), 'left');
+  setupDoubleTap(document.querySelector('.zone-right'), 'right');
+  setupDoubleTap(document.querySelector('.zone-center'), 'center');
 </script>
 </body>
 </html>
